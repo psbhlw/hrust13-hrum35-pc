@@ -1,0 +1,258 @@
+                org #6000
+
+; dehrust1 original emdedded unpacker, 256 bytes. uses stack!
+
+unpk_addr       equ #5b00
+
+dehrust:
+                di
+                ld      (save_sp+1), sp     ; fix! save sp or no (dehrust+#fd or 0)
+                ld      de, unpk_addr       ; fix! buffer for unpacker
+                ld      hl, unpacker        ; fix! unpacker addr
+                ld      bc, data-unpacker
+                push    de
+                ldir
+                inc     de
+                inc     de
+                push    de
+                pop     ix
+                ld      c, 6
+                add     hl, bc
+                ldir
+                ld      hl, 0           ; fix! last_packed_byte
+                ld      de, 0           ; fix! last_unpacked_byte
+                ld      bc, 0           ; fix! packed_length-6-6
+                ret
+
+
+
+unpacker:
+                phase   unpk_addr
+                lddr
+                inc     de
+                ex      de, hl
+                ld      sp, hl
+                ld      de, #6000       ; fix! unpack_to
+                exx
+                ld      d, #BF
+                ld      bc, #1010
+                pop     hl
+
+loc_5B0F:
+                dec     sp
+                pop     af
+                exx
+
+loc_5B12:
+                ld      (de), a
+                inc     de
+
+loc_5B14:
+                exx
+
+loc_5B15:
+                add     hl, hl
+                djnz    loc_5B1A
+                pop     hl
+                ld      b, c
+
+loc_5B1A:
+                jr      c, loc_5B0F
+                ld      e, 1
+
+loc_5B1E:
+                ld      a, #80
+
+loc_5B20:
+                add     hl, hl
+                djnz    loc_5B25
+                pop     hl
+                ld      b, c
+
+loc_5B25:
+                rla
+                jr      c, loc_5B20
+                cp      3
+                jr      c, loc_5B31
+                add     a, e
+                ld      e, a
+                xor     c
+                jr      nz, loc_5B1E
+
+loc_5B31:
+                add     a, e
+                cp      4
+                jr      z, loc_5B90
+                adc     a, #FF
+                cp      2
+                exx
+
+loc_5B3B:
+                ld      c, a
+
+loc_5B3C:
+                exx
+                ld      a, #BF
+                jr      c, loc_5B55
+
+loc_5B41:
+                add     hl, hl
+                djnz    loc_5B46
+                pop     hl
+                ld      b, c
+
+loc_5B46:
+                rla
+                jr      c, loc_5B41
+                jr      z, loc_5B50
+                inc     a
+                add     a, d
+                jr      nc, loc_5B57
+                sub     d
+
+loc_5B50:
+                inc     a
+                jr      nz, loc_5B5F
+                ld      a, #EF
+
+loc_5B55:
+                rrca
+                cp      a
+
+loc_5B57:
+                add     hl, hl
+                djnz    loc_5B5C
+                pop     hl
+                ld      b, c
+
+loc_5B5C:
+                rla
+                jr      c, loc_5B57
+
+loc_5B5F:
+                exx
+                ld      h, #FF
+                jr      z, loc_5B6A
+                ld      h, a
+                dec     sp
+                inc     a
+                jr      z, loc_5B75
+                pop     af
+
+loc_5B6A:
+                ld      l, a
+                add     hl, de
+                ldir
+
+loc_5B6E:
+                jr      loc_5B14
+; ----
+
+loc_5B70:
+                exx
+                rrc     d
+                jr      loc_5B15
+; ----
+
+loc_5B75:
+                pop     af
+                cp      #E0
+                jr      c, loc_5B6A
+                rlca
+                xor     c
+                inc     a
+                jr      z, loc_5B70
+                sub     #10
+
+loc_5B81:
+                ld      l, a
+                ld      c, a
+                ld      h, #FF
+                add     hl, de
+                ldi
+                dec     sp
+                pop     af
+                ld      (de), a
+                inc     hl
+                inc     de
+                ld      a, (hl)
+                jr      loc_5B12
+; ----
+
+loc_5B90:
+                ld      a, #80
+
+loc_5B92:
+                add     hl, hl
+                djnz    loc_5B97
+                pop     hl
+                ld      b, c
+
+loc_5B97:
+                adc     a, a
+                jr      nz, loc_5BB3
+                jr      c, loc_5B92
+                ld      a, #FC
+                jr      loc_5BB6
+; ----
+
+loc_5BA0:
+                dec     sp
+                pop     bc
+                ld      c, b
+                ld      b, a
+                ccf
+                jr      loc_5B3C
+; ----
+
+loc_5BA7:
+                cp      #0F
+                jr      c, loc_5BA0
+                jr      nz, loc_5B3B
+                add     a, #F4
+                ld      sp, ix
+                jr      loc_5BC7
+; ----
+
+loc_5BB3:
+                sbc     a, a
+                ld      a, #EF
+
+loc_5BB6:
+                add     hl, hl
+                djnz    loc_5BBB
+                pop     hl
+                ld      b, c
+
+loc_5BBB:
+                rla
+                jr      c, loc_5BB6
+                exx
+                jr      nz, loc_5B81
+                bit     7, a
+                jr      z, loc_5BA7
+                sub     #EA
+
+loc_5BC7:
+                ex      de, hl
+
+loc_5BC8:
+                pop     de
+                ld      (hl), e
+                inc     hl
+                ld      (hl), d
+                inc     hl
+                dec     a
+                jr      nz, loc_5BC8
+                ex      de, hl
+                jr      nc, loc_5B6E
+                ld      hl, #2758
+                exx
+save_sp:
+                ld      sp, 0           ; fix! sp at exit
+                ei                      ; fix! ei/di
+                jp      #52             ; fix! ret (jp 52h) or jmp start
+
+                unphase
+
+data:
